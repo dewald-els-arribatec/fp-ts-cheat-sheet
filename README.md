@@ -12,16 +12,76 @@ Website: [https://gcanti.github.io/fp-ts/](https://gcanti.github.io/fp-ts/)
 ## FP TS 
 
 ### `pipe()`
-Start with initial value
+
+Start with initial value and pass output of previous function into next function.
+
+#### `pipe()` **Single function example** 
+
+```typescript
+import { pipe } from "fp-ts/function";
+
+const numberA: number = 10;
+
+const addOne = (n: number): number => n + 1;
+
+const result: number = pipe(
+  numberA, // Will be fed into addOne
+  addOne, // Output: 11
+);
+
+console.log(result); // Output: 11
+```
+
+#### `pipe()` **Multiple function example** 
+
+```typescript
+import { pipe } from "fp-ts/function";
+
+const numberA: number = 10;
+
+const addOne = (n: number): number => n + 1;
+const multiplyTwo = (n: number): number => n * 2;
+
+const result: number = pipe(
+  numberA, // Will be fed into addOne
+  addOne, // Output: 11 - Will be fed into multiplyTwo
+  multiplyTwo, // Output: 22
+);
+
+console.log(result); // Output: 22
+```
 
 ### `flow()`
-Combine functions 
+
+Compose functions 
+
+
+```typescript
+import { pipe } from "fp-ts/function";
+
+const numberA: number = 10;
+
+const addOne = (n: number): number => n + 1;
+const multiplyTwo = (n: number): number => n * 2;
+
+// Compose two functions together
+const addOneMultiTwo = flow(addOne, multiplyTwo);
+
+const result: number = pipe(
+  numberA, // Will be fed into addOne
+  addOneMultiTwo, // Output: 22
+);
+
+console.log(result); // Output: 22
+```
 
 ### `chain()` - `A -> M<A>`
 
 Remove the "outer layer" - Comparable to the `.flatMap()`
 
 ### `map()` - `(A -> B) -> M<A> -> M<B>`
+
+Used when input and output is of same wrapper type.
 
 - `(A -> B)` : Represents the input (A) and output (B) of the function executed on the inputs.
 - `M<A> -> M<B>` : Represents the Input type A with wrapper M and Output type B of wrapper M.
