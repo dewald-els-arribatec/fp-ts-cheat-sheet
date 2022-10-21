@@ -3,118 +3,100 @@
 Website: [https://gcanti.github.io/fp-ts/](https://gcanti.github.io/fp-ts/)
 
 
-## Notes:
-- Immutability: Try to avoid state
-- Get clarity on the input of function
-  - Must know exactly what input type is - Define type first
-  - Output is important - Define before making function
-
-## FP TS 
-
-### `pipe()`
-
-Start with initial value and pass output of previous function into next function.
-
-#### `pipe()` **Single function example** 
-
+## Codes in noramal ts:
 ```typescript
-import { pipe } from "fp-ts/function";
-
-const numberA: number = 10;
-
-const addOne = (n: number): number => n + 1;
-
-const result: number = pipe(
-  numberA, // Will be fed into addOne
-  addOne, // Output: 11
-);
-
-console.log(result); // Output: 11
+// Suppose you want to get the terminalId in the object
+const getTerminalId = (input: ExampleObjectData) => {
+  // To get the terminal id
+  // Need to check whether the value is null or undefined
+  if (input.adyen) {
+    if (input.adyen.terminalId) {
+      return input.adyen.terminalId;
+    }
+  }
+  // Return the default value;
+  return 1;
+};
 ```
-
-#### `pipe()` **Multiple function example** 
-
+## Codes in fp-ts:
 ```typescript
-import { pipe } from "fp-ts/function";
+/**
+ * Suppose you want to get the terminalId in the adyen object
+ * @param {ExampleObjectData} input - The adyen object.
+ * @return {string} - The terminal id.
+ */
+const getTerminalId = (input: ExampleObjectData) => {
+  /*
+    First, create an Option type and wrap the data inside Option becasue it can be null or undefined
+    Use the Option constructor fromNullable
+  */
+  const adyenOption = option.fromNullable(input.adyen);
 
-const numberA: number = 10;
+  /*
+    Now we have the data wrapped in Option type,
+    adyenOption can be "None" or "Some(data)"
 
-const addOne = (n: number): number => n + 1;
-const multiplyTwo = (n: number): number => n * 2;
+    To further get the terminal id in adyenOption,
+    we want to do something like "adyen.terminalId"
+    But "adyen" is wrapped in Option type
+    So we need to unwarp the "adyen" value from the Option type then do "adyen.terminalId",
+    and the "adyen.terminalId" should also be wrapped in Option type becasue it can be null or undefined
+    Imagine we already have a valid "adyen" value (not null or undefined) and we create a function to get "adyen.terminalId™
+  */
+  const getAdyenTerminalId = (adyen: NonNullable<ExampleObjectData['adyen']>) =>
+    option.fromNullable(adyen.transactionId);
+  /*
+    So now we just need to unwarp the "adyen" value, feed it into "getAdyenTerminalId" to get the transactionId
+    To unwarp the data from a Container like Option and then feed the value to another function, we use "map"
+  */
+  const result = option.map(getAdyenTerminalId)(adyenOption);
 
-const result: number = pipe(
-  numberA, // Will be fed into addOne
-  addOne, // Output: 11 - Will be fed into multiplyTwo
-  multiplyTwo, // Output: 22
-);
+  /*
+    But if you look at the type of the result, the data "terminalId" is wrapped inside two layers of Option, why?
+    First look at the type signature of "map" in Option, which is f:(a: A -> b: B) -> Option<a: A> -> Option<b: B>
+    And "map" works is like this: it unwraps the data "a" from Option, feed the value "a" as an input to f,
+    then wrap the result "b" with Option and return it
+    So in the example, the "adyen" value is unwrapped from Option first, then it is fed to the function "getAdyenTerminalId",
+    then wrap the result "option.fromNullable(adyen.transactionId)" with Option and return it,
+    So that's why we have the final result with Option<Option<string>>
+    In this case, we want to "flatten" Option<Option<string>> to get Option<string>,
+    To "flatten" something, we use "chain" in fp-ts
+    So instead of using map ("option.map(getAdyenTerminalId)(adyenOption)"), we use chain
+  */
+  const niceResult = option.chain(getAdyenTerminalId)(adyenOption);
 
-console.log(result); // Output: 22
+  /* Now, we just need to get the data inside Option */
+  if (option.isSome(niceResult)) {
+    /* return the result by using .value */
+    // return niceResult.value;
+  }
+
+  /*
+    If it is null or undefined it should be None
+    In this case we return the default value 1
+  */
+  // return 1;
+
+  /*
+    Done? Not so fast :)
+    We don't want (need) any if else statement in fp,
+    so let's use the destructor "getOrElse" in this case
+  */
+  // const terminalId = option.getOrElse(() => 1);
+  // return terminalId;
+
+  /*
+    Another style using "pipe"
+    Less code :)
+    And instead of doing option.chain(getAdyenTerminalId),
+    We can do it like this:  option.chainNullableK(adyen => adyen.terminalId)
+  */
+
+  const resultUsingPipe = pipe(
+    adyenOption,
+    option.chainNullableK(adyen => adyen.terminalId),
+    option.getOrElse(() => '1')
+  );
+  return resultUsingPipe;
+};
 ```
-
-### `flow()`
-
-Compose functions 
-
-
-```typescript
-import { pipe } from "fp-ts/function";
-
-const numberA: number = 10;
-
-const addOne = (n: number): number => n + 1;
-const multiplyTwo = (n: number): number => n * 2;
-
-// Compose two functions together
-const addOneMultiTwo = flow(addOne, multiplyTwo);
-
-const result: number = pipe(
-  numberA, // Will be fed into addOne
-  addOneMultiTwo, // Output: 22
-);
-
-console.log(result); // Output: 22
-```
-
-### `chain()` - `A -> M<A>`
-
-Remove the "outer layer" - Comparable to the `.flatMap()`
-
-### `map()` - `(A -> B) -> M<A> -> M<B>`
-
-Used when input and output is of same wrapper type.
-
-- `(A -> B)` : Represents the input (A) and output (B) of the function executed on the inputs.
-- `M<A> -> M<B>` : Represents the Input type A with wrapper M and Output type B of wrapper M.
-
-```javascript
-const arr: number[] = [1,2]
-// Bad! The normal way.
-arr.map(item => item + 1)
-
-// Functional 
-const addOne = (item): number => item + 1
-
-// number -> number 
-const outputArr: number[] = A.map(addOne)(arr);
-
-// Comparable 
-A.map(addOne)(arr) === A.map(item => item + 1)(arr);
-
-// for Option 
-const numberO: Option<number> = option.of(1)
-const outputO: Option<number> = option.map(addOne)(numberO) // option.map will "unwrap" the option and pass the value to addOne.
-
-option.map = (fn: (in: number) => number) => (inputOpt: Option<number>): Option<number> => {
-  const input = option.value(inputOpt); // Unwrap value from option.
-  const output: number = fn(input)
-  return option.of(output); // wraps it to Option<number>
-} 
-```
-
-## Side Notes:
-
-The Container type - Output will be the input 
-
-**i.e.**
-
-Either<error, number> -> Either<error, number> NOT TaskEither<error, number>
